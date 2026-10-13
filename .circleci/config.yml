@@ -1,48 +1,26 @@
 version: 2.1
 
-aliases:
-  - &defaults
-    working_directory: ~/repo
-    docker:
-      - image: circleci/node:14.5-browsers
-
+# Maintained CircleCI syntax replacing deprecated circleci/node:14.5.
+# This legacy Mozilla Hubs fork has old Webpack dependencies and MUST be
+# test-run before switching a production/release dependency to CircleCI.
 jobs:
-  build_and_test:
-    <<: *defaults
+  full-verification:
+    docker:
+      - image: cimg/node:20.19.5-browsers
+    resource_class: large
+    environment:
+      NODE_OPTIONS: --openssl-legacy-provider
     steps:
       - checkout
-      - restore_cache:
-          keys:
-          - v1-dependencies-{{ checksum "package-lock.json" }}
-          - v1-dependencies-
-      - run: npm ci
-      - save_cache:
-          paths:
-            - node_modules
-          key: v1-dependencies-{{ checksum "package-lock.json" }}
-      - run: npm test
+      - run:
+          name: Install exact legacy lockfile dependencies
+          command: npm ci
+      - run:
+          name: Existing lint, unit tests and Webpack release build
+          command: npm test
       - store_artifacts:
           path: dist
-      - persist_to_workspace:
-          root: .
-          paths:
-            - node_modules
-  deploy_storybook:
-    <<: *defaults
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run: npm run deploy-storybook -- --ci
-
 workflows:
-  version: 2
-  build_test_and_deploy_storybook:
+  complete-source-checks:
     jobs:
-      - build_and_test
-      - deploy_storybook:
-          requires:
-            - build_and_test
-          filters:
-            branches:
-              only: room-ui-redesign
+      - full-verification
